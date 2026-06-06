@@ -1,0 +1,261 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth Tables
+model Account {
+  id                 String  @id @default(cuid()) @map("_id")
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+  
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid()) @map("_id")
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  id         String   @id @default(cuid()) @map("_id")
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Class Management
+model Class {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String   // e.g., "EY jupiter", "EY venus"
+  teacherId String   // Reference to the teacher
+  teacher   User     @relation("TeacherClass", fields: [teacherId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  students  User[]   @relation("StudentClass")
+  suggestions TeacherSuggestion[] @relation("ClassSuggestions")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, teacherId])
+  @@index([teacherId])
+}
+
+// App User Model
+model User {
+  id            String    @id @default(cuid()) @map("_id")
+  name          String?   // Full name from OAuth
+  username      String?   @unique
+  email         String?   @unique
+  emailVerified DateTime?
+  password      String?
+  gender        String?
+  image         String?
+  role          String    @default("student") // student, teacher
+  classId       String?   // For students assigned to class
+  class         Class?    @relation("StudentClass", fields: [classId], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // NextAuth relations
+  accounts      Account[]
+  sessions      Session[]
+
+  scores        Score[]
+  createdRaces  Race[]    @relation("CreatedRaces")
+  raceParticipants RaceParticipant[] @relation("RaceParticipants")
+  lessonProgress LessonProgress[]
+  teacherClasses Class[]  @relation("TeacherClass") // Classes this user teaches
+  
+  // New relations for tracking and suggestions
+  typingMinutes TypingMinutes[] @relation("UserTypingMinutes")
+  teacherSuggestions TeacherSuggestion[] @relation("TeacherSuggestions")
+  notifications Notification[] @relation("UserNotifications")
+}
+
+model Score {
+  id        String   @id @default(cuid()) @map("_id")
+  wpm       Int
+  accuracy  Float
+  rawWpm    Int
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([wpm])
+  @@index([userId])
+}
+
+model Race {
+  id           String   @id @default(cuid()) @map("_id")
+  roomCode     String   @unique
+  status       String   @default("waiting") // waiting, active, finished
+  startTime    DateTime?
+  endTime      DateTime?
+  countdown    Int      @default(0) // Countdown timer (0-10)
+  createdAt    DateTime @default(now())
+
+  creatorId    String
+  creator      User     @relation("CreatedRaces", fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  participants RaceParticipant[]
+  sentenceId   Int      @default(0)
+
+  @@index([creatorId])
+}
+
+model RaceParticipant {
+  id           String   @id @default(cuid()) @map("_id")
+  raceId       String
+  race         Race     @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  
+  userId       String
+  user         User     @relation("RaceParticipants", fields: [userId], references: [id], onDelete: Cascade)
+  
+  wpm          Float    @default(0)
+  rawWpm       Float    @default(0)
+  accuracy     Float    @default(100)
+  progress     Int      @default(0) // characters typed
+  finished     Boolean  @default(false)
+  finishTime   DateTime?
+  createdAt    DateTime @default(now())
+
+  @@unique([raceId, userId])
+  @@index([raceId])
+  @@index([userId])
+}
+
+model LessonProgress {
+  id        String   @id @default(cuid()) @map("_id")
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId  Int
+  completed Boolean  @default(false)
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+}
+
+model Activity {
+  id        String   @id @default(cuid()) @map("_id")
+  userId    String
+  isActive  Boolean
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([timestamp])
+}
+
+// Typing Minutes Tracking
+model TypingMinutes {
+  id        String   @id @default(cuid()) @map("_id")
+  userId    String
+  user      User     @relation("UserTypingMinutes", fields: [userId], references: [id], onDelete: Cascade)
+  
+  minutes   Int      @default(0) // Total minutes typed in this session
+  lessonId  Int?     // Optional: which lesson was being typed
+  date      DateTime @default(now()) // Date of the session
+  source    String   @default("test") // "test", "lesson", "race"
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, date])
+  @@index([date])
+}
+
+// Teacher Suggestions
+model TeacherSuggestion {
+  id        String   @id @default(cuid()) @map("_id")
+  teacherId String
+  teacher   User     @relation("TeacherSuggestions", fields: [teacherId], references: [id], onDelete: Cascade)
+  
+  classId   String
+  class     Class    @relation("ClassSuggestions", fields: [classId], references: [id], onDelete: Cascade)
+  
+  sentence  String   // The text to be typed
+  description String? // Optional description/instructions
+  
+  // Track completions
+  completions SuggestionCompletion[] @relation("SuggestionCompletions")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([teacherId])
+  @@index([classId])
+  @@index([createdAt])
+}
+
+// Track which students completed which suggestions
+model SuggestionCompletion {
+  id            String   @id @default(cuid()) @map("_id")
+  suggestionId  String
+  suggestion    TeacherSuggestion @relation("SuggestionCompletions", fields: [suggestionId], references: [id], onDelete: Cascade)
+  
+  studentId     String
+  wpm           Int      // Student's WPM when completing the suggestion
+  accuracy      Float    // Student's accuracy percentage
+  
+  completedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@unique([suggestionId, studentId])
+  @@index([suggestionId])
+  @@index([studentId])
+  @@index([completedAt])
+}
+
+// Notifications
+model Notification {
+  id        String   @id @default(cuid()) @map("_id")
+  userId    String
+  user      User     @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      String   @default("suggestion") // "suggestion", "announcement", "achievement"
+  title     String
+  message   String
+  
+  // For suggestion type
+  suggestionId String?
+  
+  // Status
+  read      Boolean  @default(false)
+  readAt    DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, read])
+  @@index([createdAt])
+}
