@@ -194,7 +194,11 @@ export default function TeacherDashboardContent() {
       setLoading(true);
       setError('');
       console.log('Fetching class:', selectedClass);
-      const response = await fetch(`/api/teacher/class/${selectedClass}?email=${encodeURIComponent(user?.email)}`);
+      // Get email from localStorage authUser (set during login)
+      const authUser = localStorage.getItem('authUser');
+      const userEmail = authUser ? JSON.parse(authUser)?.email : user?.email;
+      
+      const response = await fetch(`/api/teacher/class/${selectedClass}?email=${encodeURIComponent(userEmail)}`);
       
       if (!response.ok) {
         let errorMessage = 'Failed to fetch students';
@@ -355,7 +359,11 @@ export default function TeacherDashboardContent() {
   const fetchTeacherClasses = async () => {
     try {
       setClassesLoading(true);
-      const response = await fetch('/api/teacher/classes', {
+      // Get email from localStorage authUser (set during login)
+      const authUser = localStorage.getItem('authUser');
+      const userEmail = authUser ? JSON.parse(authUser)?.email : user?.email;
+      
+      const response = await fetch(`/api/teacher/classes?email=${encodeURIComponent(userEmail)}`, {
         credentials: 'include'
       });
 
