@@ -9,6 +9,7 @@ import {
   EnvelopeIcon,
   LockClosedIcon,
   ArrowRightOnRectangleIcon,
+  NoSymbolIcon,
 } from '@heroicons/react/24/outline';
 
 export default function LoginContent() {
@@ -22,12 +23,32 @@ export default function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOAuthLoading] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [providersStatus, setProvidersStatus] = useState({
+    google: false,
+    github: false,
+  });
 
   useEffect(() => {
     if (searchParams.get('signup') === 'success') {
       setShowSuccessModal(true);
     }
   }, [searchParams]);
+
+  // Check provider status
+  useEffect(() => {
+    const checkProviders = async () => {
+      try {
+        const res = await fetch('/api/auth/providers-status');
+        if (res.ok) {
+          const data = await res.json();
+          setProvidersStatus(data);
+        }
+      } catch (err) {
+        console.error('Failed to check providers:', err);
+      }
+    };
+    checkProviders();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -217,11 +238,14 @@ export default function LoginContent() {
             <button
               type="button"
               onClick={() => handleOAuthSignIn('google')}
-              disabled={oauthLoading !== null}
+              disabled={oauthLoading !== null || !providersStatus.google}
+              title={!providersStatus.google ? 'Google OAuth not configured' : 'Sign in with Google'}
               className="w-full py-3 px-4 rounded-xl font-medium bg-white dark:bg-slate-700 border-2 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-3"
             >
               {oauthLoading === 'google' ? (
                 <div className="w-5 h-5 border-2 border-gray-300 dark:border-slate-400 border-t-gray-900 dark:border-t-white rounded-full animate-spin" />
+              ) : !providersStatus.google ? (
+                <NoSymbolIcon className="w-5 h-5 text-red-500" />
               ) : (
                 <svg
                   className="w-5 h-5"
@@ -241,11 +265,14 @@ export default function LoginContent() {
             <button
               type="button"
               onClick={() => handleOAuthSignIn('github')}
-              disabled={oauthLoading !== null}
+              disabled={oauthLoading !== null || !providersStatus.github}
+              title={!providersStatus.github ? 'GitHub OAuth not configured' : 'Sign in with GitHub'}
               className="w-full py-3 px-4 rounded-xl font-medium bg-gray-900 dark:bg-gray-800 text-white hover:bg-gray-800 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-3"
             >
               {oauthLoading === 'github' ? (
                 <div className="w-5 h-5 border-2 border-white border-t-gray-900 rounded-full animate-spin" />
+              ) : !providersStatus.github ? (
+                <NoSymbolIcon className="w-5 h-5 text-red-500" />
               ) : (
                 <svg
                   className="w-5 h-5"
