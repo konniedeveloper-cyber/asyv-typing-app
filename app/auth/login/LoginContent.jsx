@@ -65,6 +65,8 @@ export default function LoginContent() {
     setLoading(true);
 
     try {
+      console.log('📝 [FRONTEND] Attempting login for:', formData.email);
+      
       // Use our custom login endpoint instead of NextAuth provider
       const response = await fetch('/api/user/login', {
         method: 'POST',
@@ -76,8 +78,11 @@ export default function LoginContent() {
         credentials: 'include', // Ensure cookies are sent
       });
 
+      console.log('📝 [FRONTEND] Login response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('❌ [FRONTEND] Login error response:', errorData);
         setError(errorData.error || 'Invalid email or password');
         setLoading(false);
         return;
@@ -86,6 +91,7 @@ export default function LoginContent() {
       const data = await response.json();
       
       if (!data.success) {
+        console.error('❌ [FRONTEND] Login failed:', data);
         setError('Login failed');
         setLoading(false);
         return;
@@ -106,7 +112,6 @@ export default function LoginContent() {
           : '/dashboard';
 
       console.log('🔄 [FRONTEND] Redirecting to:', redirectUrl);
-      console.log('🔄 [FRONTEND] Session cookie should be set as next-auth.session-token');
 
       // Use replace instead of push to prevent back button issues
       router.replace(redirectUrl);
@@ -117,8 +122,8 @@ export default function LoginContent() {
         window.location.href = redirectUrl;
       }, 1000);
     } catch (err) {
-      console.error('Login error:', err);
-      setError('An error occurred. Please try again.');
+      console.error('❌ [FRONTEND] Login error:', err);
+      setError(err.message || 'An error occurred. Please try again.');
       setLoading(false);
     }
   };

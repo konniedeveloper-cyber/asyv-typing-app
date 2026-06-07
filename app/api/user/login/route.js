@@ -12,38 +12,57 @@ export async function POST(request) {
     console.log('🔐 [LOGIN] Attempt:', email);
 
     if (!email || !password) {
+      console.log('❌ [LOGIN] Missing email or password');
       return NextResponse.json({
-        error: 'Invalid credentials'
-      }, { status: 401 });
+        error: 'Email and password are required'
+      }, { status: 400 });
     }
 
     // Find user
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        password: true,
-        role: true,
-        image: true,
-      },
-    });
+    let user;
+    try {
+      user = await prisma.user.findUnique({
+        where: { email: email.toLowerCase().trim() },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          password: true,
+          role: true,
+          image: true,
+        },
+      });
+      console.log('✅ [LOGIN] Database query successful');
+    } catch (dbErr) {
+      console.error('🚨 [LOGIN] Database error during user lookup:', dbErr.message);
+      console.error('🚨 [LOGIN] DATABASE_URL configured:', !!process.env.DATABASE_URL);
+      return NextResponse.json({
+        error: 'Database connection error'
+      }, { status: 500 });
+    }
 
     if (!user) {
       console.log('❌ [LOGIN] User not found:', email);
       return NextResponse.json({
-        error: 'Invalid credentials'
+        error: 'Invalid email or password'
       }, { status: 401 });
     }
 
     // Check password
-    const passwordMatch = await bcrypt.compare(password, user.password);
+    let passwordMatch;
+    try {
+      passwordMatch = await bcrypt.compare(password, user.password);
+    } catch (bcryptErr) {
+      console.error('🚨 [LOGIN] Bcrypt error:', bcryptErr.message);
+      return NextResponse.json({
+        error: 'Password verification failed'
+      }, { status: 500 });
+    }
     
     if (!passwordMatch) {
       console.log('❌ [LOGIN] Password mismatch');
       return NextResponse.json({
-        error: 'Invalid credentials'
+        error: 'Invalid email or password'
       }, { status: 401 });
     }
 
@@ -106,10 +125,10 @@ export async function POST(request) {
 
     return response;
   } catch (error) {
-    console.error('🚨 [LOGIN] Error:', error.message);
+    console.error('🚨 [LOGIN] Unexpected error:', error.message);
     console.error('🚨 [LOGIN] Stack:', error.stack);
     return NextResponse.json({
-      error: 'Authentication failed'
+      error: 'Authentication failed - ' + error.message
     }, { status: 500 });
   }
 }
